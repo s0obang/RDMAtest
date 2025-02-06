@@ -168,6 +168,7 @@ static int handle_event() {
 
 static void on_connect() {
     struct rdma_conn_param conn_param; //커넥셪ㄴ파라미터..?
+    struct ibv_device_attr dev_attr;//추가
 
     /* Allocate resources */
     build_context(&ctx, id); //rdma컨텍스트 빌드
@@ -180,9 +181,15 @@ static void on_connect() {
     }
     printf("Queue Pair created: %p\n\n", (void*)id->qp);
     
-    // **QP 상태 변경 추가
+    //  GUID
+    if (ibv_query_device(id->verbs, &dev_attr)) {
+        perror("Failed to query device attributes");
+        exit(EXIT_FAILURE);
+    }
+
+    //QP 상태 전환
     transition_qp_to_init(id->qp);
-    transition_qp_to_rtr(id->qp, id->qp->qp_num, id->verbs->device->node_guid);  // RTR 상태 전환
+    transition_qp_to_rtr(id->qp, id->qp->qp_num, dev_attr.sys_image_guid);
     transition_qp_to_rts(id->qp);
 
     pre_post_recv_buffer(); //수신할 버퍼설정
