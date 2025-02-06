@@ -69,3 +69,75 @@ void build_qp_attr(struct ibv_qp_init_attr *attr, struct rdma_context *ctx) {
     attr->srq = NULL;
     attr->sq_sig_all = 0;
 }
+
+
+// QP 상태 전환 함수
+
+void transition_qp_to_init(struct ibv_qp* qp) {
+    struct ibv_qp_attr attr;
+    memset(&attr, 0, sizeof(attr));
+
+    attr.qp_state = IBV_QPS_INIT;
+    attr.pkey_index = 0;
+    attr.port_num = 1; // 사용 중인 RDMA 포트
+    attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
+
+    int flags = IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_ACCESS_FLAGS;
+
+    if (ibv_modify_qp(qp, &attr, flags)) {
+        perror("Failed to set QP to INIT");
+        exit(EXIT_FAILURE);
+    }
+    printf("[QP] Transitioned to INIT state.\n");
+}
+
+void transition_qp_to_rtr(struct ibv_qp* qp, uint32_t remote_qp_num, uint32_t remote_lid) {
+    struct ibv_qp_attr attr;
+    memset(&attr, 0, sizeof(attr));
+
+    attr.qp_state = IBV_QPS_RTR;
+    attr.path_mtu = IBV_MTU_256;
+    attr.dest_qp_num = remote_qp_num;  // 상대방 QP 번호
+    attr.rq_psn = 0;
+    attr.max_dest_rd_atomic = 1;
+    attr.min_rnr_timer = 12;
+
+    struct ibv_ah_attr ah_attr;
+    memset(&ah_attr, 0, sizeof(ah_attr));
+    ah_attr.dlid = remote_lid; // 상대방 LID
+    ah_attr.sl = 0; // 서비스 레벨
+    ah_attr.src_path_bits = 0;
+    ah_attr.port_num = 1; // RDMA 포트 번호
+
+    attr.ah_attr = ah_attr;
+
+    int flags = IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU | IBV_QP_DEST_QPN |
+        IBV_QP_RQ_PSN | IBV_QP_MAX_DEST_RD_ATOMIC | IBV_QP_MIN_RNR_TIMER;
+
+    if (ibv_modify_qp(qp, &attr, flags)) {
+        perror("Failed to set QP to RTR");
+        exit(EXIT_FAILURE);
+    }
+    printf("[QP] Transitioned to RTR state.\n");
+}
+
+void transition_qp_to_rts(struct ibv_qp* qp) {
+    struct ibv_qp_attr attr;
+    memset(&attr, 0, sizeof(attr));
+
+    attr.qp_state = IBV_QPS_RTS;
+    attr.timeout = 14;
+    attr.retry_cnt = 7;
+    attr.rnr_retry = 7;
+    attr.sq_psn = 0;
+    attr.max_rd_atomic = 1;
+
+    int flags = IBV_QP_STATE | IBV_QP_TIMEOUT | IBV_QP_RETRY_CNT |
+        IBV_QP_RNR_RETRY | IBV_QP_SQ_PSN | IBV_QP_MAX_QP_RD_ATOMIC;
+
+    if (ibv_modify_qp(qp, &attr, flags)) {
+        perror("Failed to set QP to RTS");
+        exit(EXIT_FAILURE);
+    }
+    printf("[QP] Transitioned to RTS state.\n");
+}

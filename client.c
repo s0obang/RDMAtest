@@ -167,6 +167,12 @@ static void connect_server() {
     conn_param.private_data_len = sizeof(rep_pdata);
 
     printf("Connecting...\n");
+
+    // **QP 상태 전환 추가**
+    transition_qp_to_init(id->qp);
+    transition_qp_to_rtr(id->qp, rep_pdata.buf_va, rep_pdata.buf_rkey);
+    transition_qp_to_rts(id->qp);
+
     if (rdma_connect(id, &conn_param)) {
         perror("Failed to connect to remote host");
         exit(EXIT_FAILURE);

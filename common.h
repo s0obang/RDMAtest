@@ -80,4 +80,9 @@ void build_context(struct rdma_context *ctx, struct rdma_cm_id *id);
 //큐페어(QP) 속성을 설정하는 함수
 void build_qp_attr(struct ibv_qp_init_attr *attr, struct rdma_context *ctx);
 
+// QP 상태 전환 함수
+void transition_qp_to_init(struct ibv_qp* qp);
+void transition_qp_to_rtr(struct ibv_qp* qp, uint32_t remote_qp_num, uint32_t remote_lid);
+void transition_qp_to_rts(struct ibv_qp* qp);
+
 #endif // COMMON_H
