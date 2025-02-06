@@ -180,10 +180,10 @@ static void on_connect() {
     }
     printf("Queue Pair created: %p\n\n", (void*)id->qp);
     
-    // **QP 상태 변경 추가**
-    transition_qp_to_init(id->qp);  // INIT 상태로 전환
-    transition_qp_to_rtr(id->qp, id->qp->qp_num, id->context->device->node_guid);  // RTR 상태 전환
-    transition_qp_to_rts(id->qp);  // RTS 상태로 전환
+    // **QP 상태 변경 추가
+    transition_qp_to_init(id->qp);
+    transition_qp_to_rtr(id->qp, id->qp->qp_num, id->verbs->device->node_guid);  // RTR 상태 전환
+    transition_qp_to_rts(id->qp);
 
     pre_post_recv_buffer(); //수신할 버퍼설정
 
