@@ -253,7 +253,7 @@ static int pre_post_recv_buffer() {
 }
 
 //RDMA 작업(송신 또는 수신)이 완료될 때까지 기다리는 함수
-static void wait_for_completion()
+static void wait_for_completion(){
 
     int ret;
 
@@ -261,7 +261,7 @@ static void wait_for_completion()
         ret = ibv_poll_cq(ctx.cq, 1, &wc);
     } while (ret == 0);// 작업 완료 이벤트가 발생할 때까지 대기함
 
-    if (ret < 0) 
+    if (ret < 0) {
         perror("ibv_poll_cq");
         exit(EXIT_FAILURE);
     }
@@ -288,7 +288,7 @@ static void process_message() {
             perror("Failed to allocate memory for send buffer");
             exit(EXIT_FAILURE);
         }
-//RDAM메모리로 등록 송신버퍼를
+           //RDAM메모리로 등록 송신버퍼를
         ctx.send_mr = ibv_reg_mr(ctx.pd, send_buffer, sizeof(struct message), IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE);
         if (!ctx.send_mr) {
             fprintf(stderr, "Failed to register client metadata buffer.\n");
