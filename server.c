@@ -169,6 +169,7 @@ static int handle_event() {
 static void on_connect() {
     struct rdma_conn_param conn_param; //커넥셪ㄴ파라미터..?
     struct ibv_device_attr dev_attr;//추가
+    struct ibv_port_attr port_attr;
 
     /* Allocate resources */
     build_context(&ctx, id); //rdma컨텍스트 빌드
@@ -180,23 +181,32 @@ static void on_connect() {
         exit(EXIT_FAILURE);
     }
     printf("Queue Pair created: %p\n\n", (void*)id->qp);
-    
-    //  GUID
+
+    // RDMA 장치 속성 조회 (GUID 가져오기)
     if (ibv_query_device(id->verbs, &dev_attr)) {
         perror("Failed to query device attributes");
         exit(EXIT_FAILURE);
     }
+    
+    // RDMA 포트 속성 조회 (LID 가져오기)
+    if (ibv_query_port(ctx.verbs, 1, &port_attr)) {
+        perror("Failed to query port attributes");
+        exit(EXIT_FAILURE);
+    }
 
-    //QP 상태 전환
+    // QP 상태 전환
     transition_qp_to_init(id->qp);
-    transition_qp_to_rtr(id->qp, id->qp->qp_num, dev_attr.sys_image_guid);
+    transition_qp_to_rtr(id->qp, id->qp->qp_num, port_attr.lid);
     transition_qp_to_rts(id->qp);
 
-    pre_post_recv_buffer(); //수신할 버퍼설정\
+    // QP 상태 전환 후 버퍼 설정
+    pre_post_recv_buffer();
 
     // **서버의 QP 정보 저장**
     rep_pdata.qp_num = id->qp->qp_num;
     rep_pdata.lid = port_attr.lid;
+    rep_pdata.buf_va = htonll((uintptr_t)recv_buffer);
+    rep_pdata.buf_rkey = htonl(ctx.recv_mr->rkey);
 
 //클라이언트가 RDMA를 통해 서버의 메모리에 접근할 수 있도록 정보 전달.
 //클라이언트는 이 정보를 받아 RDMA READ/WRITE 작업을 수행할 수 있음.
