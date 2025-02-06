@@ -39,6 +39,8 @@
 struct pdata { 
     uint64_t buf_va; // ?
     uint32_t buf_rkey; // remote key
+    uint32_t qp_num;   // QP 번호 추가
+    uint16_t lid;      // LID 추가
 };
 
 //메세지 타입들. one-sided만 잇내
