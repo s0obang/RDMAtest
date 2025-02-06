@@ -192,7 +192,11 @@ static void on_connect() {
     transition_qp_to_rtr(id->qp, id->qp->qp_num, dev_attr.sys_image_guid);
     transition_qp_to_rts(id->qp);
 
-    pre_post_recv_buffer(); //수신할 버퍼설정
+    pre_post_recv_buffer(); //수신할 버퍼설정\
+
+    // **서버의 QP 정보 저장**
+    rep_pdata.qp_num = id->qp->qp_num;
+    rep_pdata.lid = port_attr.lid;
 
 //클라이언트가 RDMA를 통해 서버의 메모리에 접근할 수 있도록 정보 전달.
 //클라이언트는 이 정보를 받아 RDMA READ/WRITE 작업을 수행할 수 있음.
