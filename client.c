@@ -163,15 +163,10 @@ static void connect_server() {
     conn_param.initiator_depth = 3;
     conn_param.responder_resources = 3;
     conn_param.retry_count = 3;
-    conn_param.private_data = &rep_pdata; 
+    conn_param.private_data = &rep_pdata;
     conn_param.private_data_len = sizeof(rep_pdata);
 
     printf("Connecting...\n");
-
-    // **QP 상태 전환 추가**
-    transition_qp_to_init(id->qp);
-    transition_qp_to_rtr(id->qp, rep_pdata.buf_va, rep_pdata.buf_rkey);
-    transition_qp_to_rts(id->qp);
 
     if (rdma_connect(id, &conn_param)) {
         perror("Failed to connect to remote host");
@@ -184,15 +179,45 @@ static void connect_server() {
     }
     printf("Connection established.\n");
 
+    // **private_data 크기 확인**
+    if (event->param.conn.private_data_len != sizeof(rep_pdata)) {
+        fprintf(stderr, "Error: Received incorrect private data size. Expected %lu, got %d\n",
+            sizeof(rep_pdata), event->param.conn.private_data_len);
+        exit(EXIT_FAILURE);
+    }
     memcpy(&rep_pdata, event->param.conn.private_data, sizeof(rep_pdata));
-    printf("Received Server Memory at address %p with RKey %u\n\n",(void *)rep_pdata.buf_va, ntohl(rep_pdata.buf_rkey));
+    printf("Received Server Memory at address %p with RKey %u, QP_Num: %u\n",
+        (void*)ntohll(rep_pdata.buf_va), ntohl(rep_pdata.buf_rkey), rep_pdata.qp_num);
 
+    // **GID 값 출력 (디버깅용)**
+    printf("Received Server Memory Info - VA: %p, RKey: %u, QP_Num: %u, GID: ",
+        (void*)ntohll(rep_pdata.buf_va), ntohl(rep_pdata.buf_rkey), rep_pdata.qp_num);
+    for (int i = 0; i < 16; i++) {
+        printf("%02x", rep_pdata.gid.raw[i]);
+        if (i < 15) printf(":");
+    }
+    printf("\n");
+
+    // **QP가 NULL인지 확인**
+    if (!id->qp) {
+        fprintf(stderr, "Error: QP is NULL before modifying to INIT.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // **QP 상태 전환**
+    transition_qp_to_init(id->qp);
+    transition_qp_to_rtr(id->qp, rep_pdata.qp_num, &rep_pdata.gid);
+    transition_qp_to_rts(id->qp);
+
+    // **이벤트 ACK를 마지막에 수행**
     if (rdma_ack_cm_event(event)) {
         perror("Failed to acknowledge cm event");
         exit(EXIT_FAILURE);
     }
-    printf("The client is connected successfully. \n\n");
+
+    printf("The client is connected successfully.\n\n");
 }
+
 
 int on_connect() {
     char command[256];

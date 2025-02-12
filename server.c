@@ -167,13 +167,12 @@ static int handle_event() {
 }
 
 static void on_connect() {
-    struct rdma_conn_param conn_param; //커넥셪ㄴ파라미터..?
-    struct ibv_device_attr dev_attr;//추가
-    struct ibv_port_attr port_attr;
+    struct rdma_conn_param conn_param;
+    union ibv_gid gid;
 
     /* Allocate resources */
-    build_context(&ctx, id); //rdma컨텍스트 빌드
-    build_qp_attr(&qp_attr, &ctx); //큐페어 속성 설정하는거 아까 본거 위에서
+    build_context(&ctx, id);
+    build_qp_attr(&qp_attr, &ctx);
 
     printf("Creating QP...\n");
     if (rdma_create_qp(id, ctx.pd, &qp_attr)) {
@@ -182,55 +181,60 @@ static void on_connect() {
     }
     printf("Queue Pair created: %p\n\n", (void*)id->qp);
 
-    // RDMA 장치 속성 조회 (GUID 가져오기)
-    if (ibv_query_device(id->verbs, &dev_attr)) {
-        perror("Failed to query device attributes");
-        exit(EXIT_FAILURE);
-    }
-    
-    // RDMA 포트 속성 조회 (LID 가져오기)
-    if (ibv_query_port(ctx.verbs, 1, &port_attr)) {
-        perror("Failed to query port attributes");
+    // **GID 가져오기**
+    if (ibv_query_gid(id->verbs, 1, 0, &gid)) {
+        perror("Failed to query GID");
         exit(EXIT_FAILURE);
     }
 
-    // QP 상태 전환
-    transition_qp_to_init(id->qp);
-    transition_qp_to_rtr(id->qp, id->qp->qp_num, port_attr.lid);
-    transition_qp_to_rts(id->qp);
+    memset(&rep_pdata, 0, sizeof(rep_pdata));
+    rep_pdata.qp_num = id->qp->qp_num;
+    memcpy(&rep_pdata.gid, &gid, sizeof(gid));
 
-    // QP 상태 전환 후 버퍼 설정
+    // **버퍼 설정**
     pre_post_recv_buffer();
 
-    // **서버의 QP 정보 저장**
-    rep_pdata.qp_num = id->qp->qp_num;
-    rep_pdata.lid = port_attr.lid;
+    if (!ctx.recv_mr) {
+        fprintf(stderr, "Error: Memory region is not registered.\n");
+        exit(EXIT_FAILURE);
+    }
     rep_pdata.buf_va = htonll((uintptr_t)recv_buffer);
     rep_pdata.buf_rkey = htonl(ctx.recv_mr->rkey);
 
-//클라이언트가 RDMA를 통해 서버의 메모리에 접근할 수 있도록 정보 전달.
-//클라이언트는 이 정보를 받아 RDMA READ/WRITE 작업을 수행할 수 있음.
-    rep_pdata.buf_va = htonll((uintptr_t) recv_buffer); //서버의 RDMA 메모리 가상 주소 (Virtual Address)
-    rep_pdata.buf_rkey = htonl(ctx.recv_mr->rkey); //서버 메모리의 Remote Key (RKey)
+    // **private_data 크기 확인**
+    printf("Server sending private_data size: %lu bytes\n", sizeof(rep_pdata));
+
+    if (sizeof(rep_pdata) > 56) {
+        fprintf(stderr, "Error: private_data size exceeds allowed limit. (Size: %lu bytes)\n", sizeof(rep_pdata));
+        exit(EXIT_FAILURE);
+    }
 
     memset(&conn_param, 0, sizeof(conn_param));
-	conn_param.initiator_depth = 3; //클라이언트 최대 3개 보낼수 있음
-    conn_param.responder_resources = 3; // 서버 최대 3개 동시처리 가능
-    conn_param.retry_count = 3; // 연결 실패시 재시도 수
-    conn_param.private_data = &rep_pdata; //서버 주소 정보(위에서 설정한거)
+    conn_param.initiator_depth = 3;
+    conn_param.responder_resources = 3;
+    conn_param.retry_count = 3;
+
+    conn_param.private_data = &rep_pdata;
     conn_param.private_data_len = sizeof(rep_pdata);
 
-//클라이언트 수락( 필요정보 다 세팅한거랑 같이)
+    // **🔥 QP 상태 전환**
+    transition_qp_to_init(id->qp);
+    transition_qp_to_rtr(id->qp, rep_pdata.qp_num, &rep_pdata.gid);
+    transition_qp_to_rts(id->qp);
+
+    // 호출 전 값 검증
+    printf("Calling rdma_accept with private_data_len: %d\n", conn_param.private_data_len);\
+
+
+    // **🔥 클라이언트 연결 요청 수락**
     if (rdma_accept(id, &conn_param)) {
         perror("rdma_accept");
         exit(EXIT_FAILURE);
     }
-    printf("Connection accepted.\n\n");
-    //클라이언트가 서버에 자신의 RDMA 메모리 정보(buf_va, rkey)를 보내면 저장.
-//이제 서버도 클라이언트의 메모리에 RDMA WRITE/READ 작업을 수행할 수 있음.
-    memcpy(&rep_pdata,event->param.conn.private_data,sizeof(rep_pdata));
-    printf("Received client Memory at address %p with RKey %u\n", (void *)rep_pdata.buf_va, ntohl(rep_pdata.buf_rkey));
+    printf("Connection accepted.\n");
 }
+
+
 
 //RDMA 수신을 위한 메모리 등록 및 수신 요청 설정을 담당
 static int pre_post_recv_buffer() {

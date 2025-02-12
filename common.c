@@ -91,7 +91,7 @@ void transition_qp_to_init(struct ibv_qp* qp) {
     printf("[QP] Transitioned to INIT state.\n");
 }
 
-void transition_qp_to_rtr(struct ibv_qp* qp, uint32_t remote_qp_num, uint32_t remote_lid) {
+void transition_qp_to_rtr(struct ibv_qp* qp, uint32_t remote_qp_num, union ibv_gid* remote_gid) {
     struct ibv_qp_attr attr;
     memset(&attr, 0, sizeof(attr));
 
@@ -100,14 +100,17 @@ void transition_qp_to_rtr(struct ibv_qp* qp, uint32_t remote_qp_num, uint32_t re
     attr.dest_qp_num = remote_qp_num;  // 상대방 QP 번호
     attr.rq_psn = 0;
     attr.max_dest_rd_atomic = 1;
-    attr.min_rnr_timer = 12;
+    attr.min_rnr_timer = 0x12;
 
+    // **GID 기반 주소 설정**
     struct ibv_ah_attr ah_attr;
     memset(&ah_attr, 0, sizeof(ah_attr));
-    ah_attr.dlid = remote_lid; // 상대방 LID
-    ah_attr.sl = 0; // 서비스 레벨
-    ah_attr.src_path_bits = 0;
-    ah_attr.port_num = 1; // RDMA 포트 번호
+    ah_attr.is_global = 1;  // 글로벌 주소 사용 (RoCE 환경)
+    ah_attr.port_num = 1;    // RDMA 포트 번호
+    ah_attr.grh.dgid = *remote_gid;  // 서버에서 받은 GID 설정
+    ah_attr.grh.flow_label = 0;
+    ah_attr.grh.sgid_index = 0;  // 적절한 SGID Index 사용
+    ah_attr.grh.hop_limit = 255; // RoCE 환경에서는 255 설정
 
     attr.ah_attr = ah_attr;
 
@@ -126,7 +129,7 @@ void transition_qp_to_rts(struct ibv_qp* qp) {
     memset(&attr, 0, sizeof(attr));
 
     attr.qp_state = IBV_QPS_RTS;
-    attr.timeout = 14;
+    attr.timeout = 0x12;
     attr.retry_cnt = 7;
     attr.rnr_retry = 7;
     attr.sq_psn = 0;

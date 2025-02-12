@@ -40,7 +40,7 @@ struct pdata {
     uint64_t buf_va; // ?
     uint32_t buf_rkey; // remote key
     uint32_t qp_num;   // QP 번호 추가
-    uint16_t lid;      // LID 추가
+    union ibv_gid gid; // GID 추가 (16바이트)
 };
 
 //메세지 타입들. one-sided만 잇내
@@ -84,7 +84,7 @@ void build_qp_attr(struct ibv_qp_init_attr *attr, struct rdma_context *ctx);
 
 // QP 상태 전환 함수
 void transition_qp_to_init(struct ibv_qp* qp);
-void transition_qp_to_rtr(struct ibv_qp* qp, uint32_t remote_qp_num, uint32_t remote_lid);
+void transition_qp_to_rtr(struct ibv_qp* qp, uint32_t remote_qp_num, union ibv_gid* remote_gid);
 void transition_qp_to_rts(struct ibv_qp* qp);
 
 #endif // COMMON_H
