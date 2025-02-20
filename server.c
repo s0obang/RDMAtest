@@ -181,7 +181,7 @@ static void on_connect() {
     }
     printf("Queue Pair created: %p\n\n", (void*)id->qp);
 
-    // **GID 가져오기**
+    //GID 가져오기
     if (ibv_query_gid(id->verbs, 1, 0, &gid)) {
         perror("Failed to query GID");
         exit(EXIT_FAILURE);
@@ -191,7 +191,7 @@ static void on_connect() {
     rep_pdata.qp_num = id->qp->qp_num;
     memcpy(&rep_pdata.gid, &gid, sizeof(gid));
 
-    // **버퍼 설정**
+    //버퍼 설정
     pre_post_recv_buffer();
 
     if (!ctx.recv_mr) {
@@ -201,7 +201,7 @@ static void on_connect() {
     rep_pdata.buf_va = htonll((uintptr_t)recv_buffer);
     rep_pdata.buf_rkey = htonl(ctx.recv_mr->rkey);
 
-    // **private_data 크기 확인**
+    // private_data 크기 확인................
     printf("Server sending private_data size: %lu bytes\n", sizeof(rep_pdata));
 
     if (sizeof(rep_pdata) > 56) {
@@ -217,16 +217,16 @@ static void on_connect() {
     conn_param.private_data = &rep_pdata;
     conn_param.private_data_len = sizeof(rep_pdata);
 
-    // **🔥 QP 상태 전환**
+    //QP 상태 전환
     transition_qp_to_init(id->qp);
     transition_qp_to_rtr(id->qp, rep_pdata.qp_num, &rep_pdata.gid);
     transition_qp_to_rts(id->qp);
 
     // 호출 전 값 검증
-    printf("Calling rdma_accept with private_data_len: %d\n", conn_param.private_data_len);\
+    printf("Calling rdma_accept with private_data_len: %d\n", conn_param.private_data_len);
 
 
-    // **🔥 클라이언트 연결 요청 수락**
+    //클라이언트 연결 요청 수락 이TLQKFTOrl왜안되니..
     if (rdma_accept(id, &conn_param)) {
         perror("rdma_accept");
         exit(EXIT_FAILURE);

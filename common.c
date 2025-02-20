@@ -110,7 +110,7 @@ void transition_qp_to_rtr(struct ibv_qp* qp, uint32_t remote_qp_num, union ibv_g
     ah_attr.grh.dgid = *remote_gid;  // 서버에서 받은 GID 설정
     ah_attr.grh.flow_label = 0;
     ah_attr.grh.sgid_index = 0;  // 적절한 SGID Index 사용
-    ah_attr.grh.hop_limit = 255; // RoCE 환경에서는 255 설정
+    ah_attr.grh.hop_limit = 255; 
 
     attr.ah_attr = ah_attr;
 
